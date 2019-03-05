@@ -1,0 +1,85 @@
+#!/bin/bash
+clear
+sudo mkdir /media/pi/ROMS
+sudo mount /dev/sda1 /media/pi/ROMS
+
+function withmusicyes() {
+	unset options i
+	while IFS= read -r -d $'\0' f; do
+		options[i++]="$f"
+	done < <(find /home/pi/Music/ -maxdepth 1 -type f -print0 )
+
+	clear
+	echo "Please pick your music"
+	select ask in "all" "multiple" "${options[@]}"; do
+		case $ask in
+			all) startmusic /home/pi/Music/;;
+			multiple) choosemusic;;
+			*) startmusic $ask;;
+		esac
+	done
+}
+
+function choosemusic() {
+	unset files i
+	while IFS= read -r -d $'\0' f; do
+		files[i++]="$f"
+	done < <(find /home/pi/Music/ -maxdepth 1 -type f -print0 )
+	files[i++]=back
+	
+
+	menuitems() {
+		clear
+		echo "Available options (just press enter when finished):"
+		for i in ${!files[@]}; do
+			printf "%3d%s) %s\n" $((i+1)) "${choices[i]:- }" "${files[i]}"
+		done
+		[[ "$msg" ]] && echo "$msg"; :
+	}
+
+	prompt="Enter an option: "
+	while menuitems && read -rp "$prompt" num && [[ "$num" ]]; do
+		if [ $num == ${#files[@]} ]; then
+			withmusicyes
+		fi
+		((num--)); msg="${files[num]} was ${choices[num]:+un-}selected"
+		[[ "${choices[num]}" ]] && choices[num]="" || choices[num]="x"
+		printf "\n\nAny other choices? \n"
+	done
+
+	unset paths i
+
+	printf "You selected"; msg=" nothing"
+	for i in ${!files[@]}; do
+		[[ "${choices[i]}" ]] && { printf " %s" "${files[i]}"; msg=""; }
+		if [ "${choices[i]}" == "x" ]; then
+			paths=( "${paths[@]}" "${files[i]}" )
+		fi
+	done
+	startmusic "${paths[@]}"
+}
+
+function startmusic() {
+	musicpath=("$@")
+
+	cvlc "${musicpath[@]}" --loop -V dummy --rc-fake-tty &
+
+	find /opt/retropie/configs -maxdepth 1 -mindepth 1 -type d -exec sudo sed -i.bak 's/audio_enable = "true"/audio_enable = "false"/' {}/retroarch.cfg \;
+
+	emulationstation
+}
+
+function withmusicno() {
+	find /opt/retropie/configs -maxdepth 1 -mindepth 1 -type d -exec sudo sed -i.bak 's/audio_enable = "false"/audio_enable = "true"/' {}/retroarch.cfg \;
+
+	emulationstation
+}
+
+while true; do
+	read -p "Start with music (y/n)?" yn
+	case $yn in
+		[Yy]*) withmusicyes;;
+		[Nn]*) withmusicno;;
+		*) withmusicno;;
+	esac
+done
