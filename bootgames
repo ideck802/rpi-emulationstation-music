@@ -1,7 +1,5 @@
 #!/bin/bash
 clear
-sudo mkdir /media/pi/ROMS
-sudo mount /dev/sda1 /media/pi/ROMS
 
 function withmusicyes() {
 	unset options i
